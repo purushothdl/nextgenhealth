@@ -12,7 +12,7 @@ def initialize_gcs_client():
     return client
 
 # Upload file to GCS
-async def upload_file_to_gcs(bucket_name: str, file, ticket_id: str, file_type: str):
+async def upload_ticket_to_gcs(bucket_name: str, file, ticket_id: str, file_type: str):
     client = initialize_gcs_client()
     bucket = client.bucket(bucket_name)
 
@@ -36,6 +36,32 @@ async def upload_file_to_gcs(bucket_name: str, file, ticket_id: str, file_type: 
     # Return the public URL
     return blob.public_url
 
+async def upload_report_file_to_gcs(bucket_name: str, file, ticket_id: str, file_type: str):
+    """
+    Upload a report file (image or document) to Google Cloud Storage.
+    """
+    client = initialize_gcs_client()
+    bucket = client.bucket(bucket_name)
+
+    # Generate a unique filename
+    file_extension = os.path.splitext(file.filename)[1]
+    unique_filename = f"{uuid.uuid4()}{file_extension}"
+
+    # Generate file path
+    file_path = f"tickets/{ticket_id}/reports/{unique_filename}"
+
+    # Detect content type using the provided content type or by guessing from the filename
+    content_type = file.content_type or mimetypes.guess_type(file.filename)[0] or "application/octet-stream"
+
+    # Upload file with correct MIME type
+    blob = bucket.blob(file_path)
+    blob.upload_from_file(file.file, content_type=content_type)
+
+    # Make the file publicly accessible
+    blob.make_public()
+
+    # Return the public URL
+    return blob.public_url
 
 def download_file_from_gcs(url: str) -> bytes:
     """

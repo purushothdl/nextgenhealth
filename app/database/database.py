@@ -10,3 +10,4 @@ Tickets = db.tickets
 Notifications = db.notifications
 Chats = db.chats
 Feedback = db.feedback
+Reports = db.reports

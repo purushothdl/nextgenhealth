@@ -9,7 +9,7 @@ class NotificationRepository:
         await self.collection.insert_one(notification_data)
 
     async def get_notifications_by_user(self, user_id: str):
-        return await self.collection.find({"user_id": user_id}).to_list(length=None)
+        return await self.collection.find({"user_id": user_id}, {"read": False}).to_list(length=None)
 
     async def mark_all_as_read(self, user_id: str):
         await self.collection.update_many(

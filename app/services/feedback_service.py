@@ -11,7 +11,7 @@ class FeedbackService:
     async def add_feedback(
         self, rating: int, comment: str, user_id: str, user_role: str
     ) -> Feedback:
-        # Create a new feedback object
+        
         feedback = Feedback(
             feedback_id=str(uuid.uuid4()),
             user_id=user_id,
@@ -20,7 +20,7 @@ class FeedbackService:
             comment=comment,
             timestamp=datetime.utcnow(),
         )
-        # Save the feedback
+        
         await self.feedback_repository.add_feedback(feedback)
         return feedback
 
