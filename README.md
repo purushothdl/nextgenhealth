@@ -99,6 +99,3 @@ To run the FastAPI application:
 
 ```bash
 uvicorn main:app --reload
-
-
-This is a sample read me file
