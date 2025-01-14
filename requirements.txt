@@ -21,6 +21,7 @@ python-dotenv
 # Data validation and serialization
 pydantic
 pydantic-settings
+email-validator
 
 # File handling
 python-multipart
