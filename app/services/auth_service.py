@@ -8,23 +8,23 @@ class AuthService:
     def __init__(self, user_service: UserService):
         self.user_service = user_service
 
-    async def authenticate_user(self, username: str, password: str) -> Token:
+    async def authenticate_user(self, email: str, password: str) -> Token:
         """
         Authenticate a user by verifying their username and password.
         If valid, return an access token.
         """
         try:
-            user = await self.user_service.get_user_by_username(username)
+            user = await self.user_service.get_user_by_email(email)
         except UserNotFoundException:
             # Raise a generic error to avoid revealing whether the username exists
-            raise InvalidCredentialsException("Invalid username or password")
+            raise InvalidCredentialsException("Invalid email or password")
 
         if not verify_password(password, user["hashed_password"]):
-            raise InvalidCredentialsException("Invalid username or password")
+            raise InvalidCredentialsException("Invalid email or password")
 
         access_token_expires = timedelta(minutes=6000)
         access_token = create_access_token(
-            data={"sub": str(user["_id"])},  # Use user_id instead of username
+            data={"sub": str(user["_id"])},  # Use user_id instead of email
             expires_delta=access_token_expires,
         )
         return {"access_token": access_token, "token_type": "bearer"}

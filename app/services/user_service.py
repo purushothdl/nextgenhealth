@@ -24,8 +24,6 @@ class UserService:
         """
         Register a new user and notify admins.
         """
-        if await self.user_repository.user_exists(username=user_data.get("username")):
-            raise UserAlreadyExistsException("Username already exists")
         if await self.user_repository.user_exists(email=user_data.get("email")):
             raise UserAlreadyExistsException("Email already exists")
 
@@ -69,6 +67,16 @@ class UserService:
             raise UserNotFoundException("User not found")
         return user
 
+    async def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """
+        Retrieve a user by their email.
+        - Raises an exception if the user is not found.
+        """
+        user = await self.user_repository.get_user_by_email(email)
+        if not user:
+            raise UserNotFoundException("User not found")
+        return user
+
     async def update_user_profile(self, user_id: str, update_data: Dict) -> Dict:
         """
         Update a user's profile.
@@ -82,16 +90,34 @@ class UserService:
         update_data.pop("hashed_password", None)
         update_data.pop("role", None)
 
+        # Flatten the update data for nested fields
+        def flatten_dict(d: Dict, parent_key: str = "", sep: str = ".") -> Dict:
+            """
+            Flattens a nested dictionary into a single-level dictionary with keys
+            concatenated by a separator (e.g., "patient_data.age").
+            """
+            items = []
+            for k, v in d.items():
+                new_key = f"{parent_key}{sep}{k}" if parent_key else k
+                if isinstance(v, dict):
+                    items.extend(flatten_dict(v, new_key, sep=sep).items())
+                else:
+                    items.append((new_key, v))
+            return dict(items)
+
+        # Flatten the update data
+        flattened_update_data = flatten_dict(update_data)
+
         # Remove None values from update_data to avoid setting fields to null
-        update_data = {k: v for k, v in update_data.items() if v is not None}
+        flattened_update_data = {k: v for k, v in flattened_update_data.items() if v is not None}
 
-        await self.user_repository.update_user(user_id, update_data)
+        await self.user_repository.update_user(user_id, flattened_update_data)
 
-        user = await self.user_repository.get_user_by_id(user_id)
-        if not user:
-            raise UserNotFoundException("User not found")
+        updated_user = await self.user_repository.get_user_by_id(user_id)
+        if not updated_user:
+            raise UserNotFoundException("User not found after update")
 
-        return user
+        return updated_user
 
     async def delete_user(self, user_id: str) -> bool:
         """

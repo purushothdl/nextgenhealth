@@ -13,6 +13,9 @@ class UserRepository:
     async def get_user_by_username(self, username: str):
         return await self.collection.find_one({"username": username})
     
+    async def get_user_by_email(self, email: str):
+        return await self.collection.find_one({"email": email})
+
     async def get_user_by_role(self, role: str):
         return await self.collection.find_one({"role": role, "status": "accepted"})
 

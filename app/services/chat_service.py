@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 import uuid
 from fastapi import HTTPException
 import google.generativeai as genai
-import fitz  # PyMuPDF for PDF processing
+import fitz  
 from app.core.config import settings
 from app.repositories.chat_repository import ChatRepository
 from app.schemas.chat_schemas import ChatSession, ChatMessage

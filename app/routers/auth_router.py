@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Form, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from app.repositories.user_repository import UserRepository
 from app.schemas.user_schemas import UserCreate, UserResponse
 from app.schemas.token_schemas import Token
 from app.services.user_service import UserService
 from app.services.auth_service import AuthService
-from app.dependencies.service_dependencies import get_user_service, get_auth_service
+from app.dependencies.service_dependencies import get_user_repository, get_user_service, get_auth_service
 from app.dependencies.auth_dependencies import get_current_user
 from app.core.exceptions import (
     UserAlreadyExistsException,
@@ -33,14 +34,15 @@ async def register_user(
 
 @auth_router.post("/login", response_model=Token)
 async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    email: str = Form(...),
+    password: str = Form(...),
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """
     Authenticate a user and return an access token.
     """
     try:
-        return await auth_service.authenticate_user(form_data.username, form_data.password)
+        return await auth_service.authenticate_user(email, password)
     except InvalidCredentialsException as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -58,6 +60,27 @@ async def get_profile(
     """
     try:
         return await user_service.get_user_by_id(current_user["_id"])
+    except UserNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+@auth_router.get("/status")
+async def get_user_status(
+    email: str,
+    user_service: UserService = Depends(get_user_service),
+):
+    """
+    Get the status of the given email
+    """
+
+    try:
+        user = await user_service.get_user_by_email(email)
+        return{
+            "status": user['status']
+        }
+    
     except UserNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
