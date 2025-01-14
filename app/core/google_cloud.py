@@ -1,3 +1,4 @@
+import json
 import mimetypes
 from google.cloud import storage
 from google.oauth2 import service_account
@@ -7,9 +8,20 @@ import uuid
 
 # Initialize GCS client
 def initialize_gcs_client():
-    credentials = service_account.Credentials.from_service_account_file(settings.GOOGLE_CLOUD_CREDENTIALS_PATH)
-    client = storage.Client(credentials=credentials)
-    return client
+    # Read the GCS credentials JSON from environment variable
+    gcs_credentials_json = settings.GCS_SERVICE_ACCOUNT_KEY_JSON
+
+    if gcs_credentials_json:
+        # Parse the JSON content
+        gcs_credentials = json.loads(gcs_credentials_json)
+
+        # Initialize GCS client with the credentials
+        credentials = service_account.Credentials.from_service_account_info(gcs_credentials)
+        client = storage.Client(credentials=credentials)
+        return client
+    else:
+        raise ValueError("GCS_SERVICE_ACCOUNT_KEY_JSON environment variable is not set.")
+
 
 # Upload file to GCS
 async def upload_ticket_to_gcs(bucket_name: str, file, ticket_id: str, file_type: str):
