@@ -20,6 +20,7 @@ python-dotenv
 
 # Data validation and serialization
 pydantic
+pydantic-settings
 
 # File handling
 python-multipart
