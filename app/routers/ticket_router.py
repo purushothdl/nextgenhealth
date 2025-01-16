@@ -1,11 +1,12 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from bson import ObjectId
 from app.services.report_service import ReportService
 from app.services.ticket_service import TicketService
-from app.dependencies.service_dependencies import get_report_service, get_ticket_service
+from app.dependencies.service_dependencies import get_report_service, get_ticket_service, get_user_service
 from app.dependencies.auth_dependencies import get_current_user, get_current_doctor, get_current_admin
 from app.core.exceptions import TicketNotFoundException, UnauthorizedAccessException
+from app.services.user_service import UserService
 
 # Initialize the router
 ticket_router = APIRouter(prefix="/tickets", tags=["tickets"])
@@ -148,57 +149,65 @@ async def submit_report(
     ticket_id: str,
     diagnosis: str = Form(...),
     recommendations: str = Form(...),
+    medications: List[str] = Form(...),  # List of medications to append
     image: Optional[UploadFile] = File(None),
     document: Optional[UploadFile] = File(None),
     current_user: dict = Depends(get_current_doctor),
     report_service: ReportService = Depends(get_report_service),
     ticket_service: TicketService = Depends(get_ticket_service),
+    user_service: UserService = Depends(get_user_service)
 ):
     """
     Submit a report for a specific ticket (doctor only).
+    - Appends medications to the patient's profile.
     """
     try:
-
+        # Fetch the ticket
         ticket = await ticket_service.get_ticket_by_id(ticket_id, current_user)
         if not ticket:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Ticket not found.",
             )
-               
+
+        # Check if a report already exists for this ticket
         existing_report = await report_service.get_report_by_ticket_id(ticket_id)
         if existing_report:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A report already exists for this ticket.",
             )
-        
+
+        # Upload files (if provided)
+        image_url = None
+        if image:
+            image_url = await ticket_service.upload_report_file(image, ticket_id, "images")
+
+        docs_url = None
+        if document:
+            docs_url = await ticket_service.upload_report_file(document, ticket_id, "docs")
+
+        # Create the report
         report_data = {
             "ticket_id": ticket_id,
             "doctor_id": current_user["_id"],
             "diagnosis": diagnosis,
             "recommendations": recommendations,
-            "image_url": None,
-            "docs_url": None,
+            "medications": medications,  # Include medications in the report
+            "image_url": image_url,
+            "docs_url": docs_url,
         }
-
-        # Upload image and store its URL
-        image_url = None
-        if image:
-            image_url = await ticket_service.upload_report_file(image, ticket_id, "images")
-            report_data["image_url"] = image_url
-
-        # Upload document and store its URL
-        docs_url = None
-        if document:
-            docs_url = await ticket_service.upload_report_file(document, ticket_id, "docs")
-            report_data["docs_url"] = docs_url
-
-        # Submit the report
         report = await report_service.create_report(report_data, current_user)
 
+        # Append medications to the patient's profile
+        patient_id = ticket["patient_id"]
+        await user_service.update_user_profile(
+            patient_id,
+            {"patient_data.medications": medications}  # Append medications
+        )
+
         return report
-    
+
     except TicketNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -210,11 +219,11 @@ async def submit_report(
             detail="You are not authorized to submit a report for this ticket.",
         )
     except HTTPException as e:
-        raise e  
+        raise e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An unexpected error occurred while submitting the report.",
+            detail=f"An unexpected error occurred while submitting the report: {e}.",
         )
     
 @ticket_router.get("/{ticket_id}/report", response_model=Dict)

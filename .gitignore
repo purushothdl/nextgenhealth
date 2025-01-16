@@ -1,3 +1,5 @@
 .env
 serviceAccountKey.json
 service_account_key.json
+/app/core/firebase.py
+/app/core/google_cloud.py

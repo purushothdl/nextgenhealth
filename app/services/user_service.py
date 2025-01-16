@@ -80,9 +80,8 @@ class UserService:
     async def update_user_profile(self, user_id: str, update_data: Dict) -> Dict:
         """
         Update a user's profile.
-        - Validates the update data.
-        - Raises an exception if the user is not found.
-        - Returns the final updated user document.
+        - Appends items to any array field in patient_data.
+        - Updates other fields with $set.
         """
         if not update_data:
             raise InvalidUserDataException("No data provided for update")
@@ -92,10 +91,6 @@ class UserService:
 
         # Flatten the update data for nested fields
         def flatten_dict(d: Dict, parent_key: str = "", sep: str = ".") -> Dict:
-            """
-            Flattens a nested dictionary into a single-level dictionary with keys
-            concatenated by a separator (e.g., "patient_data.age").
-            """
             items = []
             for k, v in d.items():
                 new_key = f"{parent_key}{sep}{k}" if parent_key else k
@@ -111,14 +106,29 @@ class UserService:
         # Remove None values from update_data to avoid setting fields to null
         flattened_update_data = {k: v for k, v in flattened_update_data.items() if v is not None}
 
-        await self.user_repository.update_user(user_id, flattened_update_data)
+        # Handle array fields (e.g., patient_data.medications, patient_data.allergies)
+        array_fields = {k: v for k, v in flattened_update_data.items() if isinstance(v, list)}
+        for field, items in array_fields.items():
+            await self.user_repository.append_to_array(
+                user_id,
+                field,  # Field to update (e.g., patient_data.medications)
+                items   # Items to append
+            )
+            flattened_update_data.pop(field)  # Remove array fields from the $set update
 
+        # Update other fields with $set
+        if flattened_update_data:
+            await self.user_repository.update_user(
+                user_id,
+                flattened_update_data
+            )
+
+        # Fetch and return the updated user
         updated_user = await self.user_repository.get_user_by_id(user_id)
         if not updated_user:
             raise UserNotFoundException("User not found after update")
 
         return updated_user
-
     async def delete_user(self, user_id: str) -> bool:
         """
         Delete a user by their ID.

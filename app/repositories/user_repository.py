@@ -1,3 +1,4 @@
+from typing import Any, Dict, List
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 from app.database.database import Users
@@ -25,6 +26,19 @@ class UserRepository:
     async def update_user(self, user_id: str, update_data: dict):
         await self.collection.update_one({"_id": ObjectId(user_id)}, {"$set": update_data})
         return await self.get_user_by_id(user_id)
+    
+    async def append_to_array(self, user_id: str, field: str, items: List[Any]) -> Dict:
+        """
+        Append items to an array field in a user document.
+        - Uses the $push operator with $each to append multiple items.
+        - Works for any array field (e.g., patient_data.medications, patient_data.allergies).
+        """
+        await self.collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$push": {field: {"$each": items}}}  # Append items to the specified array field
+        )
+        return await self.get_user_by_id(user_id) 
+
 
     async def delete_user(self, user_id: str):
         result = await self.collection.delete_one({"_id": user_id})
@@ -37,7 +51,7 @@ class UserRepository:
         return await self.collection.find({"status": status}).to_list(length=None)
 
     async def user_exists(self, username: str = None, email: str = None):
-        query = {}
+        query = {} 
         if username:
             query["username"] = username
         if email:
