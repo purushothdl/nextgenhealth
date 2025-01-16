@@ -50,16 +50,17 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-@auth_router.get("/profile", response_model=UserResponse)
+@auth_router.get("/get_user/{user_id}", response_model=UserResponse)
 async def get_profile(
+    user_id: str,
     current_user: dict = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service),
 ):
     """
-    Get the current user's profile.
+    Get profile of a user
     """
     try:
-        return await user_service.get_user_by_id(current_user["_id"])
+        return await user_service.get_user_by_id(user_id)
     except UserNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
