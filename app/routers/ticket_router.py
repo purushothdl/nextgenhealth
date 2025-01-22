@@ -126,23 +126,6 @@ async def delete_ticket(
             detail=str(e),
         )
 
-@ticket_router.post("/{ticket_id}/assign")
-async def assign_doctor(
-    ticket_id: str,
-    doctor_id: str,
-    current_user: dict = Depends(get_current_admin),
-    ticket_service: TicketService = Depends(get_ticket_service),
-):
-    """
-    Assign a doctor to a ticket (admin only).
-    """
-    try:
-        return await ticket_service.assign_doctor(ticket_id, doctor_id)
-    except TicketNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
 
 @ticket_router.post("/{ticket_id}/report", status_code=status.HTTP_201_CREATED)
 async def submit_report(
@@ -162,15 +145,13 @@ async def submit_report(
     - Appends medications to the patient's profile.
     """
     try:
-        # Fetch the ticket
         ticket = await ticket_service.get_ticket_by_id(ticket_id, current_user)
         if not ticket:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Ticket not found.",
             )
-
-        # Check if a report already exists for this ticket
+        
         existing_report = await report_service.get_report_by_ticket_id(ticket_id)
         if existing_report:
             raise HTTPException(
@@ -178,7 +159,6 @@ async def submit_report(
                 detail="A report already exists for this ticket.",
             )
 
-        # Upload files (if provided)
         image_url = None
         if image:
             image_url = await ticket_service.upload_report_file(image, ticket_id, "images")
@@ -187,13 +167,12 @@ async def submit_report(
         if document:
             docs_url = await ticket_service.upload_report_file(document, ticket_id, "docs")
 
-        # Create the report
         report_data = {
             "ticket_id": ticket_id,
             "doctor_id": current_user["_id"],
             "diagnosis": diagnosis,
             "recommendations": recommendations,
-            "medications": medications,  # Include medications in the report
+            "medications": medications,  
             "image_url": image_url,
             "docs_url": docs_url,
         }
@@ -203,7 +182,7 @@ async def submit_report(
         patient_id = ticket["patient_id"]
         await user_service.update_user_profile(
             patient_id,
-            {"patient_data.medications": medications}  # Append medications
+            {"patient_data.medications": medications} 
         )
 
         return report

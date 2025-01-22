@@ -55,6 +55,7 @@ class UserService:
         user = await self.user_repository.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundException("User not found")
+        user["user_id"] = str(user["_id"])
         return user
 
     async def get_user_by_username(self, username: str) -> Optional[Dict]:
@@ -100,21 +101,8 @@ class UserService:
                     items.append((new_key, v))
             return dict(items)
 
-        # Flatten the update data
         flattened_update_data = flatten_dict(update_data)
-
-        # Remove None values from update_data to avoid setting fields to null
         flattened_update_data = {k: v for k, v in flattened_update_data.items() if v is not None}
-
-        # Handle array fields (e.g., patient_data.medications, patient_data.allergies)
-        array_fields = {k: v for k, v in flattened_update_data.items() if isinstance(v, list)}
-        for field, items in array_fields.items():
-            await self.user_repository.append_to_array(
-                user_id,
-                field,  # Field to update (e.g., patient_data.medications)
-                items   # Items to append
-            )
-            flattened_update_data.pop(field)  # Remove array fields from the $set update
 
         # Update other fields with $set
         if flattened_update_data:
@@ -123,12 +111,12 @@ class UserService:
                 flattened_update_data
             )
 
-        # Fetch and return the updated user
         updated_user = await self.user_repository.get_user_by_id(user_id)
         if not updated_user:
             raise UserNotFoundException("User not found after update")
-
+        updated_user["user_id"] = str(updated_user["_id"])
         return updated_user
+    
     async def delete_user(self, user_id: str) -> bool:
         """
         Delete a user by their ID.
@@ -160,6 +148,15 @@ class UserService:
             raise UserNotFoundException("User not found")
         return user
     
+    async def get_users_by_status(self, status: str):
+        """
+        Get users by status  i.e "pending", "accepted" , "rejected"
+        """
+        users = await self.user_repository.get_users_by_status(status)
+        if not users:
+            raise UserNotFoundException("No users found")
+        return convert_objectids_to_strings(users)
+
     async def update_fcm_token(self, user_id: str, fcm_token: str):
         """
         Update the FCM token for a user.

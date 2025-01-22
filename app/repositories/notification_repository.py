@@ -1,3 +1,4 @@
+from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 from app.database.database import Notifications
 
@@ -9,10 +10,11 @@ class NotificationRepository:
         await self.collection.insert_one(notification_data)
 
     async def get_notifications_by_user(self, user_id: str):
-        return await self.collection.find({"user_id": user_id}, {"read": False}).to_list(length=None)
+        # Filter notifications by user_id and read status
+        return await self.collection.find({"user_id": ObjectId(user_id), "read": False}).to_list(length=None)
 
     async def mark_all_as_read(self, user_id: str):
         await self.collection.update_many(
-            {"user_id": user_id, "read": False},
+            {"user_id": ObjectId(user_id), "read": False},
             {"$set": {"read": True}}
         )

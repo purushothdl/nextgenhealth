@@ -63,6 +63,7 @@ class DoctorData(BaseModel):
     
 # Schema for returning user details (response)
 class UserResponse(BaseModel):
+    user_id: str
     username: str
     email: EmailStr
     role: UserRole
@@ -76,7 +77,7 @@ class UserResponse(BaseModel):
 
 # Schema for updating user details
 class UserUpdate(BaseModel):
-    username: Optional[str] = None
+    username: Optional[str] = None 
     email: Optional[EmailStr] = None
     fcm_token: Optional[str] = None
     patient_data: Optional[PatientData] = None  # Update patient data

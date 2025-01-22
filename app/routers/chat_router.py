@@ -26,13 +26,25 @@ async def start_chat(
         image_data = None
         document_data = None
 
+        # Debug logs
+        print(f"Received ticket_id: {ticket_id}")
+        print(f"Received message: {message}")
+        print(f"Received image: {image}")
+        print(f"Received document: {document}")
+
         # If files are uploaded manually, read them as bytes
         if image:
+            print(f"Reading image file: {image.filename}")
             image_data = await image.read()
+            print(f"Image file size: {len(image_data)} bytes")
+
         if document:
+            print(f"Reading document file: {document.filename}")
             document_data = await document.read()
+            print(f"Document file size: {len(document_data)} bytes")
 
         # Start the chat session
+        print("Starting chat session...")
         return await chat_service.start_chat(
             current_user=current_user,
             user_id=str(current_user["_id"]),
@@ -41,15 +53,18 @@ async def start_chat(
             image=image_data,
             document=document_data,
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Error in start_chat: {e}")  # Debug log for errors
         raise HTTPException(status_code=500, detail=str(e))
 
 @chat_router.post("/continue", response_model=ChatSession)
 async def continue_chat(
     session_id: str = Form(...),
-    message: str = Form(...),
-    image: Optional[UploadFile] = File(None),
-    document: Optional[UploadFile] = File(None),
+    message: Optional[str] = Form(None),
+    image: Optional[UploadFile] = Form(None),
+    document: Optional[UploadFile] = Form(None),
     current_user: dict = Depends(get_current_user),
     chat_service: ChatService = Depends(get_chat_service),
 ):
@@ -68,6 +83,8 @@ async def continue_chat(
             image=image_bytes,
             document=document_bytes,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -83,6 +100,8 @@ async def end_chat(
     try:
         await chat_service.end_chat(session_id)
         return {"message": "Chat session ended successfully"}
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
@@ -113,12 +132,14 @@ async def get_chats_by_user_and_ticket(
     """
     Retrieve all chat sessions for a specific user.
     - If `ticket_id` is provided, filter chats by both `user_id` and `ticket_id`.
-    - If `ticket_id` is not provided, return all chats for the `user_id
+    - If `ticket_id` is not provided, return all chats for the `user_id`.
     """
     try:
         chats = await chat_service.get_chats_by_user_and_ticket(user_id, ticket_id)
         if not chats:
             raise HTTPException(status_code=404, detail="No chats found for the given user and ticket")
         return chats
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")

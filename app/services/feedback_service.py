@@ -9,13 +9,15 @@ class FeedbackService:
         self.feedback_repository = feedback_repository
 
     async def add_feedback(
-        self, rating: int, comment: str, user_id: str, user_role: str
+        self, title: str, rating: int, comment: str, username: str, user_id: str, user_role: str
     ) -> Feedback:
         
         feedback = Feedback(
             feedback_id=str(uuid.uuid4()),
+            username=username,
             user_id=user_id,
             user_role=user_role,
+            title=title,
             rating=rating,
             comment=comment,
             timestamp=datetime.utcnow(),

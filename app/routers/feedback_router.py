@@ -9,7 +9,8 @@ feedback_router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 @feedback_router.post("/", response_model=Feedback)
 async def add_feedback(
-    rating: int = Form(..., description="Rating provided by the user (e.g., 1-5)"),
+    rating: float = Form(..., description="Rating provided by the user (e.g., 1-5)"),
+    title: str = Form(..., description="The title of the feedback"),
     comment: str = Form(..., description="Feedback comment provided by the user"),
     current_user: dict = Depends(get_current_user),
     feedback_service: FeedbackService = Depends(get_feedback_service),
@@ -18,9 +19,11 @@ async def add_feedback(
     Submit general feedback about the app.
     """
     return await feedback_service.add_feedback(
+        title=title,
         rating=rating,
         comment=comment,
         user_id=str(current_user["_id"]),
+        username=current_user["username"],
         user_role=current_user["role"],
     )
 
