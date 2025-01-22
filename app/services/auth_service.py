@@ -22,7 +22,7 @@ class AuthService:
         if not verify_password(password, user["hashed_password"]):
             raise InvalidCredentialsException("Invalid email or password")
 
-        access_token_expires = timedelta(minutes=6000)
+        access_token_expires = timedelta(minutes=525960)
         access_token = create_access_token(
             data={"sub": str(user["_id"])},  # Use user_id instead of email
             expires_delta=access_token_expires,
