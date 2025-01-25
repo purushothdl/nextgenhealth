@@ -1,5 +1,6 @@
 from typing import Optional, Dict, List
 from datetime import datetime
+from app.schemas.user_schemas import UserResponse
 from app.utils.mongo_utils import convert_objectids_to_strings
 from app.repositories.user_repository import UserRepository
 from app.services.notification_service import NotificationService
@@ -44,8 +45,9 @@ class UserService:
                     type="user_registered",
                     fcm_token=admin["fcm_token"],
                 )
+        user["user_id"] = str(user["_id"])
         convert_objectids_to_strings(user)
-        return user
+        return UserResponse(**user)
 
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """
