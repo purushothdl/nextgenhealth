@@ -1,5 +1,6 @@
 from typing import Optional, Dict, List
 from datetime import datetime
+from app.schemas.user_schemas import UserResponse
 from app.utils.mongo_utils import convert_objectids_to_strings
 from app.repositories.user_repository import UserRepository
 from app.services.notification_service import NotificationService
@@ -24,8 +25,6 @@ class UserService:
         """
         Register a new user and notify admins.
         """
-        if await self.user_repository.user_exists(username=user_data.get("username")):
-            raise UserAlreadyExistsException("Username already exists")
         if await self.user_repository.user_exists(email=user_data.get("email")):
             raise UserAlreadyExistsException("Email already exists")
 
@@ -46,8 +45,9 @@ class UserService:
                     type="user_registered",
                     fcm_token=admin["fcm_token"],
                 )
+        user["user_id"] = str(user["_id"])
         convert_objectids_to_strings(user)
-        return user
+        return UserResponse(**user)
 
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """
@@ -57,6 +57,7 @@ class UserService:
         user = await self.user_repository.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundException("User not found")
+        user["user_id"] = str(user["_id"])
         return user
 
     async def get_user_by_username(self, username: str) -> Optional[Dict]:
@@ -69,12 +70,21 @@ class UserService:
             raise UserNotFoundException("User not found")
         return user
 
+    async def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """
+        Retrieve a user by their email.
+        - Raises an exception if the user is not found.
+        """
+        user = await self.user_repository.get_user_by_email(email)
+        if not user:
+            raise UserNotFoundException("User not found")
+        return user
+
     async def update_user_profile(self, user_id: str, update_data: Dict) -> Dict:
         """
         Update a user's profile.
-        - Validates the update data.
-        - Raises an exception if the user is not found.
-        - Returns the final updated user document.
+        - Appends items to any array field in patient_data.
+        - Updates other fields with $set.
         """
         if not update_data:
             raise InvalidUserDataException("No data provided for update")
@@ -82,17 +92,33 @@ class UserService:
         update_data.pop("hashed_password", None)
         update_data.pop("role", None)
 
-        # Remove None values from update_data to avoid setting fields to null
-        update_data = {k: v for k, v in update_data.items() if v is not None}
+        # Flatten the update data for nested fields
+        def flatten_dict(d: Dict, parent_key: str = "", sep: str = ".") -> Dict:
+            items = []
+            for k, v in d.items():
+                new_key = f"{parent_key}{sep}{k}" if parent_key else k
+                if isinstance(v, dict):
+                    items.extend(flatten_dict(v, new_key, sep=sep).items())
+                else:
+                    items.append((new_key, v))
+            return dict(items)
 
-        await self.user_repository.update_user(user_id, update_data)
+        flattened_update_data = flatten_dict(update_data)
+        flattened_update_data = {k: v for k, v in flattened_update_data.items() if v is not None}
 
-        user = await self.user_repository.get_user_by_id(user_id)
-        if not user:
-            raise UserNotFoundException("User not found")
+        # Update other fields with $set
+        if flattened_update_data:
+            await self.user_repository.update_user(
+                user_id,
+                flattened_update_data
+            )
 
-        return user
-
+        updated_user = await self.user_repository.get_user_by_id(user_id)
+        if not updated_user:
+            raise UserNotFoundException("User not found after update")
+        updated_user["user_id"] = str(updated_user["_id"])
+        return updated_user
+    
     async def delete_user(self, user_id: str) -> bool:
         """
         Delete a user by their ID.
@@ -124,6 +150,15 @@ class UserService:
             raise UserNotFoundException("User not found")
         return user
     
+    async def get_users_by_status(self, status: str):
+        """
+        Get users by status  i.e "pending", "accepted" , "rejected"
+        """
+        users = await self.user_repository.get_users_by_status(status)
+        if not users:
+            raise UserNotFoundException("No users found")
+        return convert_objectids_to_strings(users)
+
     async def update_fcm_token(self, user_id: str, fcm_token: str):
         """
         Update the FCM token for a user.

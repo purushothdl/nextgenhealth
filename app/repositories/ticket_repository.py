@@ -29,3 +29,6 @@ class TicketRepository:
     async def delete_ticket(self, ticket_id: str):
         result = await self.collection.delete_one({"_id": ObjectId(ticket_id)})
         return result.deleted_count > 0
+    
+    async def get_tickets_by_status(self, status: str):
+        return await self.collection.find({"status": status}).to_list(length=None)

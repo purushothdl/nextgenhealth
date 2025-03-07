@@ -1,4 +1,6 @@
 from fastapi import Depends
+from app.repositories.report_repository import ReportRepository
+from app.services.report_service import ReportService
 from app.services.user_service import UserService
 from app.services.auth_service import AuthService
 from app.services.admin_service import AdminService
@@ -11,7 +13,7 @@ from app.repositories.ticket_repository import TicketRepository
 from app.repositories.chat_repository import ChatRepository
 from app.repositories.feedback_repository import FeedbackRepository  # Import FeedbackRepository
 from app.repositories.notification_repository import NotificationRepository
-from app.database.database import Users, Tickets, Notifications, Feedback  # Add Feedback collection
+from app.database.database import Users, Tickets, Notifications, Feedback, Reports  # Add Feedback collection
 
 # Repository dependencies
 def get_user_repository():
@@ -28,6 +30,9 @@ def get_chat_repository():
 
 def get_feedback_repository():  # Add FeedbackRepository dependency
     return FeedbackRepository(collection=Feedback)
+
+def get_report_repository():
+    return ReportRepository(collection=Reports)
 
 # Service dependencies
 
@@ -75,3 +80,11 @@ def get_feedback_service(
     feedback_repository: FeedbackRepository = Depends(get_feedback_repository),
 ):
     return FeedbackService(feedback_repository)
+
+def get_report_service(
+    report_repository: ReportRepository = Depends(get_report_repository),
+    user_repository: UserRepository = Depends(get_user_repository),
+    notification_service: NotificationService = Depends(get_notification_service),
+    ticket_repository: TicketRepository = Depends(get_ticket_repository)
+):
+    return ReportService(report_repository, user_repository, notification_service, ticket_repository)

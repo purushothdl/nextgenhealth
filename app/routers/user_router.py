@@ -21,11 +21,11 @@ async def get_profile(
     except UserNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            detail=str(e), 
         )
 
 @user_router.put("/me", response_model=UserResponse)
-async def update_profile(
+async def update_profile( 
     update_data: UserUpdate,
     current_user: dict = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service),
@@ -40,7 +40,7 @@ async def update_profile(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
-    
+       
 @user_router.post("/update-fcm-token")
 async def update_fcm_token(
     fcm_token: str,
@@ -58,3 +58,4 @@ async def update_fcm_token(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         )
+

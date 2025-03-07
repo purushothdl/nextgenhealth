@@ -2,6 +2,7 @@ from app.repositories.notification_repository import NotificationRepository
 from app.core.firebase import messaging
 from datetime import datetime
 from app.core.exceptions import NotificationException
+from app.utils.mongo_utils import convert_objectids_to_strings
 
 class NotificationService:
     def __init__(self, notification_repository: NotificationRepository):
@@ -37,7 +38,10 @@ class NotificationService:
             raise NotificationException(f"Failed to send FCM notification: {e}")
 
     async def get_notifications(self, user_id: str):
-        return await self.notification_repository.get_notifications_by_user(user_id)
+        notifications = await self.notification_repository.get_notifications_by_user(user_id)
+        for notification in notifications:
+            convert_objectids_to_strings(notification)
+        return notifications
 
     async def mark_all_as_read(self, user_id: str):
         await self.notification_repository.mark_all_as_read(user_id)

@@ -1,0 +1,43 @@
+# FastAPI and ASGI server
+fastapi
+uvicorn
+
+# MongoDB
+motor
+pymongo
+
+# Google Cloud Storage
+google-cloud-storage
+google-auth
+
+# Authentication and security
+python-jose
+passlib
+bcrypt
+
+# Environment variables
+python-dotenv
+
+# Data validation and serialization
+pydantic
+pydantic-settings
+email-validator
+
+# File handling
+python-multipart
+
+# Image processing
+Pillow
+
+# PDF processing
+PyMuPDF
+
+# HTTP client
+aiohttp
+
+
+
+# Additional dependencies for your code
+google-generativeai  # For google.generativeai
+firebase-admin       # For firebase_admin and messaging
+python-jose          # For jwt (already included)

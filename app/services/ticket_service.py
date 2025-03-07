@@ -1,6 +1,7 @@
+from typing import Optional
 from bson import ObjectId
 from fastapi import UploadFile
-from app.core.google_cloud import download_file_from_gcs, upload_file_to_gcs
+from app.core.google_cloud import download_file_from_gcs, upload_report_file_to_gcs, upload_ticket_to_gcs
 from app.repositories.ticket_repository import TicketRepository
 from app.services.notification_service import NotificationService
 from app.repositories.user_repository import UserRepository
@@ -14,9 +15,9 @@ class TicketService:
         self.notification_service = notification_service
         self.user_repository = user_repository
 
-    async def get_tickets(self, current_user: dict):
+    async def get_tickets(self, current_user: dict, status: Optional[str] = None):
         """
-        Get tickets based on the user's role:
+        Get tickets based on the user's role and optional status filter.
         - Admin: All tickets
         - Doctor: Assigned tickets
         - Patient: Own tickets
@@ -30,7 +31,9 @@ class TicketService:
         else:
             raise UnauthorizedAccessException("Unauthorized access")
 
-        # Convert ObjectId fields to strings
+        if status:
+            tickets = [ticket for ticket in tickets if ticket.get("status") == status]
+            
         return convert_objectids_to_strings(tickets)
 
     async def get_ticket_by_id(self, ticket_id: str, current_user: dict):
@@ -57,7 +60,7 @@ class TicketService:
         """
         try:
             # Upload file to GCS
-            file_url = await upload_file_to_gcs(
+            file_url = await upload_ticket_to_gcs(
                 bucket_name=settings.GOOGLE_CLOUD_BUCKET_NAME,
                 file=file,
                 ticket_id=ticket_id,  # Use ticket_id for folder structure
@@ -66,6 +69,22 @@ class TicketService:
             return file_url
         except Exception as e:
             raise Exception(f"Failed to upload file: {e}")
+
+    async def upload_report_file(self, file: UploadFile, ticket_id: str, file_type: str):
+        """
+        Upload a report file (image or document) to Google Cloud Storage and return the public URL.
+        """
+        try:
+            # Upload file to GCS
+            file_url = await upload_report_file_to_gcs(
+                bucket_name=settings.GOOGLE_CLOUD_BUCKET_NAME,
+                file=file,
+                ticket_id=ticket_id,  # Use ticket_id for folder structure
+                file_type=file_type,
+            )
+            return file_url
+        except Exception as e:
+            raise Exception(f"Failed to upload report file: {e}")
 
     async def create_ticket(self, ticket_data: dict):
         """

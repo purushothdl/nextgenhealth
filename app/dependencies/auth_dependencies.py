@@ -30,7 +30,7 @@ async def get_current_user(
 
     # Fetch user by user_id
     user = await user_service.get_user_by_id(user_id)
-    if user is None:
+    if user is None or user['status'] != 'accepted':
         raise credentials_exception
     return user
 

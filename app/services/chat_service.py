@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 import uuid
 from fastapi import HTTPException
 import google.generativeai as genai
-import fitz  # PyMuPDF for PDF processing
+import fitz  
 from app.core.config import settings
 from app.repositories.chat_repository import ChatRepository
 from app.schemas.chat_schemas import ChatSession, ChatMessage
@@ -101,7 +101,41 @@ class ChatService:
                     prompt_parts.append(f"Allergies: {', '.join(patient_data['allergies'])}")
 
         return "\n".join(prompt_parts)
-    
+
+    async def _process_image(self, image: Optional[bytes]) -> Optional[PIL.Image.Image]:
+        """
+        Process an image from bytes.
+        """
+        if not image:
+            return None
+
+        try:
+            img = PIL.Image.open(BytesIO(image))
+            return img
+        except Exception as e:
+            print(f"Error processing image: {str(e)}")
+            return None
+
+    async def _process_document(self, document: Optional[bytes]) -> Optional[str]:
+        """
+        Process a document from bytes.
+        """
+        if not document:
+            return None
+
+        try:
+            if isinstance(document, bytes):
+                doc = fitz.open(stream=document, filetype="pdf")
+                text_content = ""
+                for page in doc:
+                    text_content += page.get_text()
+                return text_content
+            else:
+                return document.decode('utf-8', errors='ignore')
+        except Exception as e:
+            print(f"Error processing document: {str(e)}")
+            return None
+
     async def start_chat(
         self,
         current_user: dict,
@@ -109,62 +143,56 @@ class ChatService:
         ticket_id: Optional[str] = None,
         message: Optional[str] = None,
         image: Optional[bytes] = None,
-        document: Optional[str] = None,
+        document: Optional[bytes] = None,
     ) -> ChatSession:
         # Fetch previous chat history if this is a continuation of an existing session
         previous_history = []
+        # if ticket_id:
+        #     previous_chats = await self.chat_repository.get_chats_by_user_and_ticket(user_id, ticket_id)
+        #     for chat in previous_chats:
+        #         previous_history.extend(chat.chat_history)
+
+        # If ticket_id is provided, fetch the ticket and process its image_url and docs_url
         if ticket_id:
-            previous_chats = await self.chat_repository.get_chats_by_user_and_ticket(user_id, ticket_id)
-            for chat in previous_chats:
-                previous_history.extend(chat.chat_history)
+            ticket = await self.ticket_service.get_ticket_by_id(ticket_id, current_user)
+            if ticket:
+                # Fetch and process image from ticket's image_url
+                if ticket.get("image_url"):
+                    try:
+                        image = await fetch_file_from_url(ticket["image_url"])
+                    except Exception as e:
+                        print(f"Error fetching image from URL: {str(e)}")
+
+                # Fetch and process document from ticket's docs_url
+                if ticket.get("docs_url"):
+                    try:
+                        document = await fetch_file_from_url(ticket["docs_url"])
+                    except Exception as e:
+                        print(f"Error fetching document from URL: {str(e)}")
 
         # Start a new Gemini chat session with previous history
         chat = model.start_chat(history=previous_history)
 
         # Get formatted context
         context_prompt = await self._format_context_prompt(current_user, user_id, ticket_id)
-        
+
         # Prepare input content
-        input_content = []
-        
-        # Add the formatted context first
-        input_content.append(context_prompt)
-        
-        # Add the user's message if provided
+        input_content = [context_prompt]
+
         if message:
             input_content.append(f"User Query: {message}")
 
-        # Handle image processing
         if image:
-            try:
-                if isinstance(image, str) and image.startswith('http'):
-                    image_bytes = await fetch_file_from_url(image)
-                    img = PIL.Image.open(BytesIO(image_bytes))
-                else:
-                    img = PIL.Image.open(BytesIO(image))
+            img = await self._process_image(image)
+            if img:
                 input_content.append(img)
-            except Exception as e:
-                print(f"Error processing image: {str(e)}")
 
-        # Handle document processing
         if document:
-            try:
-                if isinstance(document, str) and document.startswith('http'):
-                    doc_bytes = await fetch_file_from_url(document)
-                    if document.lower().endswith('.pdf'):
-                        doc = fitz.open(stream=doc_bytes, filetype="pdf")
-                        text_content = ""
-                        for page in doc:
-                            text_content += page.get_text()
-                        input_content.append(f"Document content: {text_content}")
-                    else:
-                        input_content.append(f"Document content: {doc_bytes.decode('utf-8', errors='ignore')}")
-                else:
-                    input_content.append(f"Document content: {document}")
-            except Exception as e:
-                print(f"Error processing document: {str(e)}")
+            doc_text = await self._process_document(document)
+            if doc_text:
+                input_content.append(f"Document content: {doc_text}")
 
-        # Add the custom NexGenHealth prompt at the end
+        # Add the system prompt
         system_prompt = (
             "\nSYSTEM INSTRUCTIONS:\n"
             "You are the NexGenHealth AI Assistant, designed to provide medical information and support. "
@@ -175,9 +203,6 @@ class ChatService:
             "Maintain a professional yet approachable tone."
         )
         input_content.append(system_prompt)
-
-        # Log the input content for debugging
-        print("Input Content:", input_content)
 
         # Send input to the model
         response = chat.send_message(input_content)
@@ -204,13 +229,13 @@ class ChatService:
         await self.chat_repository.save_chat_session(chat_session)
 
         return chat_session
-    
+
     async def continue_chat(
         self,
         session_id: str,
         message: str,
         image: Optional[bytes] = None,
-        document: Optional[str] = None,
+        document: Optional[bytes] = None,
     ) -> ChatSession:
         # Fetch the chat session
         chat_session = await self.chat_repository.get_chat_session(session_id)
@@ -228,11 +253,16 @@ class ChatService:
 
         # Prepare input for the model
         input_content = [message]
+
         if image:
-            img = PIL.Image.open(BytesIO(image))
-            input_content.append(img)
+            img = await self._process_image(image)
+            if img:
+                input_content.append(img)
+
         if document:
-            input_content.append(f"Document content: {document}")
+            doc_text = await self._process_document(document)
+            if doc_text:
+                input_content.append(f"Document content: {doc_text}")
 
         # Add a prompt for concise responses
         input_content.append(
@@ -241,6 +271,7 @@ class ChatService:
             "Provide a concise and informative response in 4-8 lines. "
             "Focus on the key points and avoid unnecessary warnings or disclaimers. "
         )
+
         # Send input to the model
         response = chat.send_message(input_content)
 
@@ -271,7 +302,14 @@ class ChatService:
         return await self.chat_repository.get_chats_by_user_and_ticket(user_id, ticket_id)
 
     async def end_chat(self, session_id: str):
+        """
+        Checks if a chat session exists and then deletes it
+        """
+        chat_session = await self.chat_repository.get_chat_session(session_id)
+        if not chat_session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
         await self.chat_repository.delete_chat_session(session_id)
+
 
     async def get_chat_session(self, session_id: str) -> Optional[ChatSession]:
         """
